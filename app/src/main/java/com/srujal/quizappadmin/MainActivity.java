@@ -1,24 +1,212 @@
 package com.srujal.quizappadmin;
 
+import android.app.Dialog;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
+import android.util.Log;
+import android.view.View;
+import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.Toast;
 
-import androidx.activity.EdgeToEdge;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
+import androidx.appcompat.widget.AppCompatButton;
+
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.srujal.quizappadmin.Models.categoryModels;
+import com.srujal.quizappadmin.databinding.ActivityMainBinding;
+import com.squareup.picasso.Picasso;
+
+import org.json.JSONObject;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity {
+
+    private ActivityMainBinding binding;
+    private FirebaseDatabase database;
+    private DatabaseReference categoryRef;
+
+    private EditText categoryName;
+    private AppCompatButton uploadBtn;
+    private ImageView categoryImg;
+    private Dialog dialog;
+    private static String IMGUR_CLIENT_ID;
+    private static final int IMAGE_PICK_CODE = 15;
+    private Uri selectedImageUri;
+    private String uploadedImageUrl;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this);
-        setContentView(R.layout.activity_main);
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
-            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
-            return insets;
+        binding = ActivityMainBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
+
+        database = FirebaseDatabase.getInstance();
+        categoryRef = database.getReference("Categories");
+
+        IMGUR_CLIENT_ID = getString(R.string.imgur_client_iD);
+
+        setupDialog();
+        setupListeners();
+    }
+
+    private void setupDialog() {
+        dialog = new Dialog(this);
+        dialog.setContentView(R.layout.admin_add_category);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            dialog.setCancelable(true);
+        }
+        uploadBtn = dialog.findViewById(R.id.category_btn);
+        categoryName = dialog.findViewById(R.id.category_name);
+        categoryImg = dialog.findViewById(R.id.category_img);
+    }
+
+    private void setupListeners() {
+        findViewById(R.id.addCategoryBtn).setOnClickListener(view -> dialog.show());
+
+        categoryImg.setOnClickListener(view -> {
+            Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+            intent.setType("image/*");
+            startActivityForResult(intent, IMAGE_PICK_CODE);
+        });
+
+        uploadBtn.setOnClickListener(view -> {
+            String name = categoryName.getText().toString().trim();
+            if (name.isEmpty()) {
+                Toast.makeText(this, "Enter category name", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (uploadedImageUrl == null) {
+                Toast.makeText(this, "Wait for image upload", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            saveCategoryToFirebase(name, uploadedImageUrl);
+        });
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == IMAGE_PICK_CODE && resultCode == RESULT_OK && data != null) {
+            selectedImageUri = data.getData();
+            categoryImg.setImageURI(selectedImageUri);
+            uploadImageToImgur();
+        }
+    }
+
+    private void uploadImageToImgur() {
+        if (selectedImageUri == null) return;
+
+        try {
+            File imageFile = compressImage(selectedImageUri);
+            if (imageFile == null) {
+                Log.e("ImgurUpload", "Error compressing image");
+                return;
+            }
+
+            OkHttpClient client = new OkHttpClient();
+            RequestBody requestBody = new MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart("image", imageFile.getName(),
+                            RequestBody.create(imageFile, MediaType.parse("image/jpeg")))
+                    .build();
+
+            Request request = new Request.Builder()
+                    .url("https://api.imgur.com/3/image")
+                    .addHeader("Authorization", "Client-ID " + IMGUR_CLIENT_ID)
+                    .post(requestBody)
+                    .build();
+
+            client.newCall(request).enqueue(new Callback() {
+                @Override
+                public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                    Log.e("ImgurUpload", "Upload failed: " + e.getMessage());
+                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "Image upload failed", Toast.LENGTH_SHORT).show());
+                }
+
+                @Override
+                public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                    String responseBody = response.body().string();
+                    Log.d("ImgurUpload", "Response: " + responseBody);
+
+                    if (response.isSuccessful()) {
+                        uploadedImageUrl = parseImageUrl(responseBody);
+                        runOnUiThread(() -> {
+                            Toast.makeText(MainActivity.this, "Image uploaded successfully", Toast.LENGTH_SHORT).show();
+                            Picasso.get().load(uploadedImageUrl).into(categoryImg);
+                        });
+                    } else {
+                        Log.e("ImgurUpload", "Upload failed: " + response.code());
+                        runOnUiThread(() -> Toast.makeText(MainActivity.this, "Image upload failed", Toast.LENGTH_SHORT).show());
+                    }
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    private File compressImage(Uri imageUri) {
+        try {
+            Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), imageUri);
+            File tempFile = new File(getCacheDir(), "compressedImage.jpg");
+            FileOutputStream outputStream = new FileOutputStream(tempFile);
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream); // Ensuring it's JPEG
+            outputStream.flush();
+            outputStream.close();
+            return tempFile;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+
+    private String parseImageUrl(String responseBody) {
+        try {
+            JSONObject json = new JSONObject(responseBody);
+            return json.getJSONObject("data").getString("link");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private void saveCategoryToFirebase(String name, String imageUrl) {
+        categoryRef.get().addOnSuccessListener(snapshot -> {
+            String categoryKey = categoryRef.push().getKey(); // Generate unique key
+            categoryModels category = new categoryModels(name, imageUrl, 0); // Always setNum = 0
+            if (categoryKey != null) {
+                categoryRef.child(categoryKey).setValue(category)
+                        .addOnSuccessListener(aVoid -> {
+                            Toast.makeText(MainActivity.this, "Category Added", Toast.LENGTH_SHORT).show();
+                            dialog.dismiss();
+                            uploadedImageUrl = null;
+                        })
+                        .addOnFailureListener(e -> Toast.makeText(MainActivity.this, "Failed to add category", Toast.LENGTH_SHORT).show());
+            }
         });
     }
 }

@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.srujal.quizappadmin" />
+                  <option name="mobileSdkAppId" value="1:566689669105:android:cda841479f33c1822aee50" />
+                  <option name="projectId" value="quiz-app-admin-73294" />
+                  <option name="projectNumber" value="566689669105" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />
