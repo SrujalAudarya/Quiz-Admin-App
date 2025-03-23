@@ -44,8 +44,6 @@ public class MainActivity extends AppCompatActivity {
 
     private ActivityMainBinding binding;
     private FirebaseDatabase database;
-    private DatabaseReference categoryRef;
-
     private EditText categoryName;
     private AppCompatButton uploadBtn;
     private ImageView categoryImg;
@@ -62,7 +60,6 @@ public class MainActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
 
         database = FirebaseDatabase.getInstance();
-        categoryRef = database.getReference("Categories");
 
         IMGUR_CLIENT_ID = getString(R.string.imgur_client_iD);
 
@@ -195,18 +192,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveCategoryToFirebase(String name, String imageUrl) {
-        categoryRef.get().addOnSuccessListener(snapshot -> {
-            String categoryKey = categoryRef.push().getKey(); // Generate unique key
-            categoryModels category = new categoryModels(name, imageUrl, 0); // Always setNum = 0
-            if (categoryKey != null) {
-                categoryRef.child(categoryKey).setValue(category)
-                        .addOnSuccessListener(aVoid -> {
-                            Toast.makeText(MainActivity.this, "Category Added", Toast.LENGTH_SHORT).show();
-                            dialog.dismiss();
-                            uploadedImageUrl = null;
-                        })
-                        .addOnFailureListener(e -> Toast.makeText(MainActivity.this, "Failed to add category", Toast.LENGTH_SHORT).show());
-            }
-        });
+        database.getReference().child("Categories").child(name) // Using category name as key
+                .setValue(new categoryModels(name, imageUrl, 0))
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(MainActivity.this, "Category Added", Toast.LENGTH_SHORT).show();
+                    dialog.dismiss();
+                    uploadedImageUrl = null;
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(MainActivity.this, "Failed to add category", Toast.LENGTH_SHORT).show()
+                );
     }
 }
