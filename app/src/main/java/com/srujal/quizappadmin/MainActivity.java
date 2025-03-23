@@ -1,6 +1,7 @@
 package com.srujal.quizappadmin;
 
 import android.app.Dialog;
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
@@ -9,7 +10,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.util.Log;
-import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Toast;
@@ -18,9 +18,14 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.AppCompatButton;
+import androidx.recyclerview.widget.GridLayoutManager;
 
-import com.google.firebase.database.DatabaseReference;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+import com.srujal.quizappadmin.Adapter.categoryAdapter;
 import com.srujal.quizappadmin.Models.categoryModels;
 import com.srujal.quizappadmin.databinding.ActivityMainBinding;
 import com.squareup.picasso.Picasso;
@@ -30,6 +35,7 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -52,6 +58,9 @@ public class MainActivity extends AppCompatActivity {
     private static final int IMAGE_PICK_CODE = 15;
     private Uri selectedImageUri;
     private String uploadedImageUrl;
+    ProgressDialog progressDialog;
+    ArrayList<categoryModels> list;
+    categoryAdapter adapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,10 +70,43 @@ public class MainActivity extends AppCompatActivity {
 
         database = FirebaseDatabase.getInstance();
 
+        list = new ArrayList<>();
+
         IMGUR_CLIENT_ID = getString(R.string.imgur_client_iD);
 
         setupDialog();
         setupListeners();
+
+        GridLayoutManager layoutManager = new GridLayoutManager(this,2);
+        binding.recycleView.setLayoutManager(layoutManager);
+
+        adapter = new categoryAdapter(this,list);
+        binding.recycleView.setAdapter(adapter);
+
+        database.getReference().child("Categories").addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()){
+                    list.clear();
+                    for (DataSnapshot dataSnapshot : snapshot.getChildren()){
+                        list.add(new categoryModels(
+                                dataSnapshot.child("categoryName").getValue().toString(),
+                                dataSnapshot.child("categoryImage").getValue().toString(),
+                                dataSnapshot.getKey(),
+                                Integer.parseInt(dataSnapshot.child("setNum").getValue().toString())
+                        ));
+                    }
+                    adapter.notifyDataSetChanged();
+                }else {
+                    Toast.makeText(MainActivity.this, "category Not Exists", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Toast.makeText(MainActivity.this, error.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void setupDialog() {
@@ -77,6 +119,10 @@ public class MainActivity extends AppCompatActivity {
         uploadBtn = dialog.findViewById(R.id.category_btn);
         categoryName = dialog.findViewById(R.id.category_name);
         categoryImg = dialog.findViewById(R.id.category_img);
+
+        progressDialog = new ProgressDialog(this);
+        progressDialog.setTitle("Uploading");
+        progressDialog.setMessage("Please Wait...");
     }
 
     private void setupListeners() {
@@ -98,6 +144,7 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(this, "Wait for image upload", Toast.LENGTH_SHORT).show();
                 return;
             }
+            progressDialog.show();
             saveCategoryToFirebase(name, uploadedImageUrl);
         });
     }
@@ -109,6 +156,7 @@ public class MainActivity extends AppCompatActivity {
             selectedImageUri = data.getData();
             categoryImg.setImageURI(selectedImageUri);
             uploadImageToImgur();
+            progressDialog.dismiss();
         }
     }
 
@@ -140,6 +188,7 @@ public class MainActivity extends AppCompatActivity {
                 public void onFailure(@NonNull Call call, @NonNull IOException e) {
                     Log.e("ImgurUpload", "Upload failed: " + e.getMessage());
                     runOnUiThread(() -> Toast.makeText(MainActivity.this, "Image upload failed", Toast.LENGTH_SHORT).show());
+                    progressDialog.dismiss();
                 }
 
                 @Override
@@ -152,10 +201,12 @@ public class MainActivity extends AppCompatActivity {
                         runOnUiThread(() -> {
                             Toast.makeText(MainActivity.this, "Image uploaded successfully", Toast.LENGTH_SHORT).show();
                             Picasso.get().load(uploadedImageUrl).into(categoryImg);
+                            progressDialog.dismiss();
                         });
                     } else {
                         Log.e("ImgurUpload", "Upload failed: " + response.code());
                         runOnUiThread(() -> Toast.makeText(MainActivity.this, "Image upload failed", Toast.LENGTH_SHORT).show());
+                        progressDialog.dismiss();
                     }
                 }
             });
@@ -192,15 +243,21 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveCategoryToFirebase(String name, String imageUrl) {
+        String key = database.getReference().child("Categories").push().getKey();
         database.getReference().child("Categories").child(name) // Using category name as key
-                .setValue(new categoryModels(name, imageUrl, 0))
+                .setValue(new categoryModels(name, imageUrl,key, 0))
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(MainActivity.this, "Category Added", Toast.LENGTH_SHORT).show();
                     dialog.dismiss();
                     uploadedImageUrl = null;
+                    progressDialog.dismiss();
                 })
-                .addOnFailureListener(e ->
-                        Toast.makeText(MainActivity.this, "Failed to add category", Toast.LENGTH_SHORT).show()
-                );
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        Toast.makeText(MainActivity.this, "Failed to add category", Toast.LENGTH_SHORT).show();
+                        progressDialog.dismiss();
+                    }
+                });
     }
 }
