@@ -12,7 +12,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.squareup.picasso.Picasso;
 import com.srujal.quizappadmin.Models.categoryModels;
 import com.srujal.quizappadmin.R;
-import com.srujal.quizappadmin.SetsActivity;
+import com.srujal.quizappadmin.SubCategoryActivity;
 import com.srujal.quizappadmin.databinding.ItemCategoryBinding;
 
 import java.util.ArrayList;
@@ -44,6 +44,15 @@ public class categoryAdapter extends RecyclerView.Adapter<categoryAdapter.viewHo
                 .placeholder(R.drawable.placeholder)
                 .error(R.drawable.placeholder)
                 .into(holder.binding.categoryImg);
+
+        holder.itemView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intent = new Intent(context, SubCategoryActivity.class);
+                intent.putExtra("catId",models.getKey());
+                context.startActivity(intent);
+            }
+        });
     }
 
     @Override
