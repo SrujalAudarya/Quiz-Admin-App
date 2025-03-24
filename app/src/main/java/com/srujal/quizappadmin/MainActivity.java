@@ -1,5 +1,6 @@
 package com.srujal.quizappadmin;
 
+import android.app.ActionBar;
 import android.app.Dialog;
 import android.app.ProgressDialog;
 import android.content.Intent;
@@ -65,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setTitle("Admin App");
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
@@ -86,22 +88,26 @@ public class MainActivity extends AppCompatActivity {
         database.getReference().child("Categories").addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (snapshot.exists()){
+                if (snapshot.exists()) {
                     list.clear();
-                    for (DataSnapshot dataSnapshot : snapshot.getChildren()){
-                        list.add(new categoryModels(
-                                dataSnapshot.child("categoryName").getValue().toString(),
-                                dataSnapshot.child("categoryImage").getValue().toString(),
-                                dataSnapshot.getKey(),
-                                Integer.parseInt(dataSnapshot.child("setNum").getValue().toString())
-                        ));
+                    for (DataSnapshot dataSnapshot : snapshot.getChildren()) {
+                        String name = dataSnapshot.child("categoryName").getValue(String.class);
+                        String image = dataSnapshot.child("categoryImage").getValue(String.class);
+                        String key = dataSnapshot.getKey();
+                        Integer setNum = dataSnapshot.child("setNum").getValue(Integer.class);
+
+                        // Check for null values before using them
+                        if (name != null && image != null && setNum != null) {
+                            list.add(new categoryModels(name, image, key, setNum));
+                        } else {
+                            Log.e("FirebaseError", "Skipping category with missing data: " + dataSnapshot.getKey());
+                        }
                     }
                     adapter.notifyDataSetChanged();
-                }else {
-                    Toast.makeText(MainActivity.this, "category Not Exists", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(MainActivity.this, "No categories found", Toast.LENGTH_SHORT).show();
                 }
             }
-
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
                 Toast.makeText(MainActivity.this, error.getMessage(), Toast.LENGTH_SHORT).show();

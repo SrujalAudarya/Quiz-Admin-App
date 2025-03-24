@@ -12,11 +12,12 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.squareup.picasso.Picasso;
 import com.srujal.quizappadmin.Models.categoryModels;
 import com.srujal.quizappadmin.R;
+import com.srujal.quizappadmin.SetsActivity;
 import com.srujal.quizappadmin.databinding.ItemCategoryBinding;
 
 import java.util.ArrayList;
 
-public class categoryAdapter extends RecyclerView.Adapter<categoryAdapter.viewHolder>{
+public class categoryAdapter extends RecyclerView.Adapter<categoryAdapter.viewHolder> {
 
     Context context;
     ArrayList<categoryModels> list;
@@ -29,27 +30,20 @@ public class categoryAdapter extends RecyclerView.Adapter<categoryAdapter.viewHo
     @NonNull
     @Override
     public viewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(context).inflate(R.layout.item_category,parent,false);
+        View view = LayoutInflater.from(context).inflate(R.layout.item_category, parent, false);
         return new viewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull viewHolder holder, int position) {
-
         categoryModels models = list.get(position);
         holder.binding.categoryName.setText(models.getCategoryName());
 
         Picasso.get()
                 .load(models.getCategoryImage())
                 .placeholder(R.drawable.placeholder)
+                .error(R.drawable.placeholder)
                 .into(holder.binding.categoryImg);
-
-        holder.itemView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-//                Intent intent = new Intent(context, )
-            }
-        });
     }
 
     @Override
@@ -57,15 +51,12 @@ public class categoryAdapter extends RecyclerView.Adapter<categoryAdapter.viewHo
         return list.size();
     }
 
-    public class viewHolder extends RecyclerView.ViewHolder{
-
+    public class viewHolder extends RecyclerView.ViewHolder {
         ItemCategoryBinding binding;
+
         public viewHolder(@NonNull View itemView) {
             super(itemView);
-
             binding = ItemCategoryBinding.bind(itemView);
-
         }
     }
-
 }
