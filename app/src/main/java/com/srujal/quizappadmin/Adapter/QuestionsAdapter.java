@@ -13,61 +13,53 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.database.FirebaseDatabase;
-import com.squareup.picasso.Picasso;
-import com.srujal.quizappadmin.Models.categoryModels;
+import com.srujal.quizappadmin.Models.QuestionsModel;
+import com.srujal.quizappadmin.Models.SubCategoryModels;
+import com.srujal.quizappadmin.QuestionsActivity;
 import com.srujal.quizappadmin.R;
-import com.srujal.quizappadmin.SubCategoryActivity;
-import com.srujal.quizappadmin.databinding.ItemCategoryBinding;
+import com.srujal.quizappadmin.databinding.SubcategorydesignBinding;
 
 import java.util.ArrayList;
 
-public class categoryAdapter extends RecyclerView.Adapter<categoryAdapter.viewHolder> {
+public class QuestionsAdapter extends RecyclerView.Adapter<QuestionsAdapter.viewHolder> {
 
     Context context;
-    ArrayList<categoryModels> list;
+    ArrayList<QuestionsModel> list;
+    private String catId;
+    private String subCatId;
 
-    public categoryAdapter(Context context, ArrayList<categoryModels> list) {
+    public QuestionsAdapter(Context context, ArrayList<QuestionsModel> list, String catId, String subCatId) {
         this.context = context;
         this.list = list;
+        this.catId = catId;
+        this.subCatId = subCatId;
     }
 
     @NonNull
     @Override
     public viewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(context).inflate(R.layout.item_category, parent, false);
+        View view = LayoutInflater.from(context).inflate(R.layout.subcategorydesign, parent, false);
         return new viewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull viewHolder holder, int position) {
-        categoryModels models = list.get(position);
-        holder.binding.categoryName.setText(models.getCategoryName());
 
-        Picasso.get()
-                .load(models.getCategoryImage())
-                .placeholder(R.drawable.placeholder)
-                .error(R.drawable.placeholder)
-                .into(holder.binding.categoryImg);
+        QuestionsModel models = list.get(position);
 
-        holder.itemView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Intent intent = new Intent(context, SubCategoryActivity.class);
-                intent.putExtra("catId",models.getKey());
-                context.startActivity(intent);
-            }
-        });
+        holder.binding.tvsubject.setText(models.getQuestion());
+
         holder.itemView.setOnLongClickListener(new View.OnLongClickListener() {
             @Override
             public boolean onLongClick(View view) {
                 AlertDialog.Builder builder= new AlertDialog.Builder(context);
                 builder.setTitle("Delete");
-                builder.setMessage("Are you sure, you want to delete this Branch");
+                builder.setMessage("Are you sure, you want to delete this Question");
 
                 builder.setPositiveButton("Yes",(dialogInterface, i) -> {
-                    FirebaseDatabase.getInstance().getReference().child("Categories").child(models.getKey())
+                    FirebaseDatabase.getInstance().getReference().child("Categories").child(catId).child("subCategories").child(subCatId).child("questions").
+                            child(models.getKey())
                             .removeValue().addOnSuccessListener(new OnSuccessListener<Void>() {
-                                @Override
                                 public void onSuccess(Void unused) {
                                     Toast.makeText(context, "Deleted", Toast.LENGTH_SHORT).show();
                                 }
@@ -82,6 +74,7 @@ public class categoryAdapter extends RecyclerView.Adapter<categoryAdapter.viewHo
                 return true;
             }
         });
+
     }
 
     @Override
@@ -90,11 +83,11 @@ public class categoryAdapter extends RecyclerView.Adapter<categoryAdapter.viewHo
     }
 
     public class viewHolder extends RecyclerView.ViewHolder {
-        ItemCategoryBinding binding;
+        SubcategorydesignBinding binding;
 
         public viewHolder(@NonNull View itemView) {
             super(itemView);
-            binding = ItemCategoryBinding.bind(itemView);
+            binding = SubcategorydesignBinding.bind(itemView);
         }
     }
 }
